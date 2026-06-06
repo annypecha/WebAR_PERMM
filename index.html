@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"/>
+<title>PERMM — WebAR</title>
+
+<link rel="stylesheet" href="/styles.css">
+
+<script src="https://cdn.jsdelivr.net/npm/aframe@1.4.2/dist/aframe-v1.4.2.min.js"></script>
+<script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.5.0/dist/aframe-extras.min.js"></script>
+<script>
+  function loadMindAR() {
+    return new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js";
+      s.onload = resolve;
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+  window._mindARReady = loadMindAR();
+</script>
+</head>
+
+<body>
+
+<!-- ==================== START SCREEN ==================== -->
+
+<div id="startScreen">
+  <div class="start-content">
+
+    <div class="logo-rings">
+      <div class="ring ring-1"></div>
+      <div class="ring ring-2"></div>
+      <div class="ring ring-3"></div>
+      <span class="logo-letter">M</span>
+    </div>
+
+    <div class="start-labels">
+      <div class="start-museum">Музей PERMM</div>
+      <div class="start-title">WebAR Gid</div>
+    </div>
+
+    <button id="startBtn">Начать</button>
+
+    <div class="start-hint">Наведите камеру на экспонат</div>
+  </div>
+</div>
+
+<!-- ==================== AR CONTAINER ==================== -->
+
+<div id="arContainer">
+  <div id="ui">
+
+    <!-- Status pill (top center) -->
+    <div id="statusPill">
+      <div id="statusDot"></div>
+      <span id="statusText">Загрузка…</span>
+    </div>
+
+    <!-- Scan frame (center) -->
+    <div id="scanFrame">
+      <div class="corner corner-tl"></div>
+      <div class="corner corner-tr"></div>
+      <div class="corner corner-bl"></div>
+      <div class="corner corner-br"></div>
+      <div id="scanLine"></div>
+    </div>
+
+    <!-- Hint bar (bottom) -->
+    <div id="hintBar">
+      <div id="hintText">Наведите камеру на экспонат</div>
+    </div>
+
+    <!-- Exhibit info panel (bottom, hidden by default) -->
+    <div id="panel">
+      <div id="panelAccent"></div>
+      <div id="exTitle"></div>
+      <div id="exDesc"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ==================== MAIN SCRIPT ==================== -->
+
+<script type="module">
+  import { AppController } from "./src/js/app.js";
+  
+  async function startCamera() {
+    try {
+      await window._mindARReady;
+      console.log("MindAR loaded");
+    } catch(e) {
+      alert("Не удалось загрузить MindAR: " + e.message);
+      return;
+    }
+  
+    try {
+      // Запрос DeviceOrientation (iOS 13+) — делаем тихо, без стандартного UI MindAR
+      if (typeof DeviceOrientationEvent !== 'undefined' &&
+          typeof DeviceOrientationEvent.requestPermission === 'function') {
+        try {
+          await DeviceOrientationEvent.requestPermission();
+        } catch(e) {
+          console.warn("DeviceOrientation permission denied:", e);
+        }
+      }
+  
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: "environment" } },
+        audio: false
+      });
+      stream.getTracks().forEach(t => t.stop());
+  
+      const res = await fetch("/src/data/exhibits.json", { cache: "no-store" });
+      if (!res.ok) throw new Error("Не удалось загрузить exhibits.json");
+      const config = await res.json();
+  
+      // Fade out start screen
+      const startScreen = document.getElementById("startScreen");
+      startScreen.style.transition = "opacity 0.4s";
+      startScreen.style.opacity = "0";
+  
+      setTimeout(() => {
+        startScreen.style.display = "none";
+  
+        const container = document.getElementById("arContainer");
+        container.style.display = "block";
+  
+        // Create scene
+        const scene = document.createElement("a-scene");
+        const mindFile = config.app.mindFile || "/targets/targets.mind";
+  
+        scene.setAttribute("mindar-image", [
+          `imageTargetSrc: ${mindFile}`,
+          "autoStart: true",
+          "uiError: no",
+          "uiLoading: no",
+          "uiScanning: no",
+          "filterMinCF: 0.00001",
+          "filterBeta: 0.0001",
+          "missTolerance: 5",
+          "warmupTolerance: 5",
+          `maxTrack: ${config.exhibits.length}`
+        ].join("; "));
+  
+        scene.setAttribute("embedded", "");
+        scene.setAttribute("vr-mode-ui", "enabled: false");
+        scene.setAttribute("device-orientation-permission-ui", "enabled: false");
+        scene.setAttribute("color-space", "sRGB");
+        scene.setAttribute("renderer", "colorManagement: true; physicallyCorrectLights: false");
+  
+        let innerHTML = `
+          <a-entity light="type: ambient; intensity: 1.2"></a-entity>
+          <a-entity light="type: directional; intensity: 1.5" position="1 2 1"></a-entity>
+          <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+        `;
+  
+        config.exhibits.forEach((exhibit) => {
+          const idx = exhibit.targetIndex ?? 0;
+          const transform = exhibit.defaultTransform || {};
+          const [gpx, gpy, gpz] = transform.position || [0, 0, 0];
+          const [grx, gry, grz] = transform.rotation || [0, 0, 0];
+          const [gsx, gsy, gsz] = transform.scale || [1, 1, 1];
+          const groupAnim = exhibit.animation?.groupRotate
+            ? 'animation="property: rotation; to: ' + grx + ' ' + (gry + 360) + ' ' + grz + '; loop: true; dur: ' + (exhibit.animation?.duration || 10000) + '; easing: linear"'
+            : '';
+
+          let modelsHTML = '';
+          const models = exhibit.models || (exhibit.modelUrl ? [{
+            src: exhibit.modelUrl,
+            position: [0, 0, 0],
+            rotation: [0, 0, 0],
+            scale: [1, 1, 1],
+            autoPlay: exhibit.animation?.autoPlay ?? false
+          }] : []);
+
+            models.forEach((m, i) => {
+              const [px, py, pz] = m.position || [0, 0, 0];
+              const [rx, ry, rz] = m.rotation || [0, 0, 0];
+              const [sx, sy, sz] = m.scale || [1, 1, 1];
+              const mixerAttr = m.autoPlay ? 'animation-mixer="loop: repeat; timeScale: 1"' : '';
+
+              modelsHTML += `
+                <a-gltf-model
+                  id="model-${exhibit.id}-${i}"
+                  src="${m.src}"
+                  position="${px} ${py} ${pz}"
+                  rotation="${rx} ${ry} ${rz}"
+                  scale="${sx} ${sy} ${sz}"
+                  visible="true"
+                  ${mixerAttr}>
+                </a-gltf-model>
+              `;
+            });
+
+            innerHTML += `
+              <a-entity mindar-image-target="targetIndex: ${idx}" id="target-${exhibit.id}">
+                <a-entity
+                  id="model-group-${exhibit.id}"
+                  position="${gpx} ${gpy} ${gpz}"
+                  rotation="${grx} ${gry} ${grz}"
+                  scale="${gsx} ${gsy} ${gsz}"
+                  ${groupAnim}>
+                  ${modelsHTML}
+                </a-entity>
+              </a-entity>
+            `;
+        });  
+        scene.innerHTML = innerHTML;
+        container.insertBefore(scene, container.firstChild);
+  
+        // Show scan UI after scene starts
+        setTimeout(() => {
+          document.getElementById("scanFrame").classList.add("visible");
+          document.getElementById("hintBar").classList.add("visible");
+        }, 500);
+  
+        scene.addEventListener("loaded", () => {
+          console.log("A-Frame + MindAR scene loaded");
+          const app = new AppController();
+          app.init(config);
+        });
+  
+      }, 400);
+  
+    } catch (e) {
+      console.error(e);
+      alert(`${e.name}: ${e.message}\n\nПроверьте HTTPS и доступ к камере.`);
+    }
+  }
+  
+  document.getElementById("startBtn").addEventListener("click", startCamera);
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,53 @@
+{
+  "app": {
+    "mode": "image",
+    "mindFile": "/targets/targets.mind",
+    "defaultExhibitId": "exhibit_ship"
+  },
+  "exhibits": [
+    {
+      "id": "exhibit_ship",
+      "targetIndex": 0,
+      "title": "Край вулканов",
+      "description": "Авторы: Колчанова Анна, Шахова Влада",
+      "type": "surface",
+      "defaultTransform": { "position": [0.12, -0.15, 0.05], "rotation": [0, 90, 0], "scale": [0.1, 0.1, 0.1] },
+      "models": [
+        { "src": "/models/korabl_ani.glb", "position": [0, 0, 0], "rotation": [0, 0, 0], "scale": [1, 1, 1], "autoPlay": true }
+      ],
+      "interaction": {
+        "minScale": 0.15, "maxScale": 0.7,
+        "rotationSpeed": 0.25, "pinchSpeed": 0.003,
+        "allowRotation": true, "allowScale": true
+      }
+    },
+    {
+      "id": "exhibit_planes",
+      "targetIndex": 1,
+      "title": "Выше облаков",
+      "description": "Авторы: Яна Дорофеева, Слава Сузальцева",
+      "type": "volume",
+      "defaultTransform": { "position": [0, 0.02, 0.05], "rotation": [0, 0, 0], "scale": [0.45, 0.45, 0.45] },
+      "models": [
+        { "src": "/models/samolet.glb", "position": [-0.45, 0.15, 0], "rotation": [0, 35, 0], "scale": [0.45, 0.45, 0.45], "autoPlay": true },
+        { "src": "/models/samolet.glb", "position": [0.35, 0.35, -0.1], "rotation": [0, 160, 0], "scale": [0.38, 0.38, 0.38], "autoPlay": true },
+        { "src": "/models/samolet.glb", "position": [0.05, 0.55, 0.2], "rotation": [0, -70, 0], "scale": [0.32, 0.32, 0.32], "autoPlay": true }
+      ],
+      "animation": { "groupRotate": true, "duration": 9000 },
+      "interaction": { "minScale": 0.25, "maxScale": 1.8, "rotationSpeed": 0.25, "pinchSpeed": 0.006 }
+    },
+    {
+      "id": "exhibit_figures",
+      "targetIndex": 2,
+      "title": "Monkey Business",
+      "description": "Автор: Андрей Люблюнский",
+      "type": "volume",
+      "defaultTransform": { "position": [0, -0.1, 0.08], "rotation": [0, 0, 0], "scale": [0.55, 0.55, 0.55] },
+      "models": [
+        { "src": "/models/monkey_dps_animation.glb", "position": [-0.25, -0.1, 0], "rotation": [0, 15, 0], "scale": [0.55, 0.55, 0.55], "autoPlay": true },
+        { "src": "/models/monkey_vibe_animation.glb", "position": [0.4, -0.08, 0.8], "rotation": [0, -20, 0], "scale": [0.5, 0.5, 0.5], "autoPlay": true }
+      ],
+      "interaction": { "minScale": 0.25, "maxScale": 1.8, "rotationSpeed": 0.25, "pinchSpeed": 0.006 }
+    }
+  ]
+}
